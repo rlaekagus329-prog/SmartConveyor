@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
+'''
 def build_smart_conveyor_model(num_classes):
     model = models.Sequential([
         # --- [0단계] 데이터 증강 (Data Augmentation) ---
@@ -37,6 +38,71 @@ def build_smart_conveyor_model(num_classes):
                   metrics=['accuracy'])
 
     return model
+'''
+'''
+# 구조 강화 버전
+def build_smart_conveyor_model(num_classes):
+    model = models.Sequential([
+        layers.Input(shape=(224, 224, 3)),
+        layers.RandomFlip("horizontal"),
+        layers.RandomRotation(0.1),
+
+        # 128 -> 256 -> 512까지 확장
+        layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+
+        layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+
+        layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+
+        layers.Conv2D(256, (3, 3), padding='same', activation='relu'), # 층 추가
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(512, activation='relu'), # 뉴런 수 확장
+        layers.Dropout(0.5),
+        layers.Dense(num_classes, activation='softmax')
+    ])
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+'''
+
+
+# 모델 변경 버전
+def build_smart_conveyor_model(num_classes):
+    # 이미 학습된 베이스 모델 (특징 추출기)
+    base_model = tf.keras.applications.MobileNetV2(
+        input_shape=(224, 224, 3), include_top=False, weights='imagenet'
+    )
+    base_model.trainable = True #  False일단 기존 지식은 고정
+
+    model = models.Sequential([
+        layers.Input(shape=(224, 224, 3)),
+        layers.RandomFlip("horizontal"),
+        layers.RandomRotation(0.1),
+
+        base_model, # 수백만 장 학습한 뇌 장착
+
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(256, activation='relu'),
+        layers.Dropout(0.3),
+        layers.Dense(num_classes, activation='softmax')
+    ])
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                  loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+
+'''
+
+'''
 
 if __name__ == "__main__":
     # 테스트용: 모델 요약 출력

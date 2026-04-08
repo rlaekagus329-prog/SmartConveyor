@@ -11,6 +11,10 @@ import matplotlib.image as mpimg
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import numpy as np
+import cv2
+from ultralytics import YOLO
+
+
 ######### 데이터 분리
 def organize_images_by_csv(data_dir, csv_path):
     df = pd.read_csv(csv_path)
@@ -199,20 +203,22 @@ def letterbox_image(image, size=(224, 224)):
     new_image.paste(image, ((w - nw) // 2, (h - nh) // 2))
     return new_image
 
-def preprocess_and_split_data(raw_data_dir, output_dir, target_classes):
+def preprocess_and_split_data(raw_data_dir, output_dir, target_classes, apply_yolo=True):
     # 1. 저장 경로 생성
     processed_root = os.path.join(output_dir, "processed_images")
     os.makedirs(processed_root, exist_ok=True)
 
     all_data = []
 
-    print(f"🚀 {len(target_classes)}개 카테고리 전처리 시작...")
+    print(f"🚀 {len(target_classes)}개 카테고리 최종 전처리 시작...")
+
+    # [추가] YOLO 모델 로드 (루프 밖에서 한 번만 로드하여 속도 최적화)
+    if apply_yolo:
+        print("🤖 YOLOv8 모델을 로딩 중입니다 (배경 제거용)...")
+        yolo_model = YOLO('yolov8n.pt')
 
     for category in target_classes:
-        # ✅ 원본 사진이 있는 곳 (C:\SmartConveyor\data\raw\train\55 등)
         src_cat_path = os.path.join(raw_data_dir, category)
-
-        # ✅ 처리된 사진을 저장할 곳 (C:\SmartConveyor\data\raw\processed_images\55 등)
         dst_cat_path = os.path.join(processed_root, category)
         os.makedirs(dst_cat_path, exist_ok=True)
 
@@ -220,7 +226,6 @@ def preprocess_and_split_data(raw_data_dir, output_dir, target_classes):
             print(f"⚠️ {category} 원본 폴더를 찾을 수 없어 건너뜁니다.")
             continue
 
-        # 해당 카테고리 내 이미지 가져오기
         valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.JPG', '.JPEG', '.PNG')
         img_files = [f for f in os.listdir(src_cat_path) if f.endswith(valid_extensions)]
 
@@ -230,13 +235,39 @@ def preprocess_and_split_data(raw_data_dir, output_dir, target_classes):
 
         for img_name in tqdm(img_files, desc=f"Processing Class {category}"):
             try:
-                # 1. 원본 읽기 (src_cat_path 사용)
-                img = Image.open(os.path.join(src_cat_path, img_name)).convert('RGB')
+                img_path = os.path.join(src_cat_path, img_name)
 
-                # 2. Letterboxing 처리
-                proc_img = letterbox_image(img, size=(224, 224))
+                if apply_yolo:
+                    # OpenCV로 이미지 읽기 (YOLO는 cv2 포맷을 사용)
+                    img_cv2 = cv2.imread(img_path)
 
-                # 3. 결과 저장 (dst_cat_path 사용)
+                    # YOLO 탐지 실행
+                    results = yolo_model(img_cv2, verbose=False)
+                    boxes = results[0].boxes
+
+                    if len(boxes) > 0:
+                        # 신뢰도가 가장 높은 첫 번째 객체의 좌표 (x1, y1, x2, y2)
+                        b = boxes[0].xyxy[0].cpu().numpy().astype(int)
+
+                        # 방어 로직: 자를 좌표가 이미지 크기를 벗어나지 않도록 보정
+                        y1, y2 = max(0, b[1]), min(img_cv2.shape[0], b[3])
+                        x1, x2 = max(0, b[0]), min(img_cv2.shape[1], b[2])
+
+                        crop_img = img_cv2[y1:y2, x1:x2]
+                    else:
+                        # YOLO가 객체를 못 찾으면 원본 이미지 그대로 사용 (Fallback)
+                        crop_img = img_cv2
+
+                    # cv2(BGR)를 PIL(RGB)로 변환 (다음 단계인 letterbox를 위해)
+                    img_pil = Image.fromarray(cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB))
+                else:
+                    # YOLO를 안 쓸 경우 기존처럼 PIL로 바로 읽기
+                    img_pil = Image.open(img_path).convert('RGB')
+
+                # 2. Letterboxing 처리 (비율 유지하며 224x224 빈 공간 검은색 패딩)
+                proc_img = letterbox_image(img_pil, size=(224, 224))
+
+                # 3. 결과 저장
                 proc_img.save(os.path.join(dst_cat_path, img_name))
 
                 all_data.append({'name': img_name, 'group': category})
@@ -247,12 +278,12 @@ def preprocess_and_split_data(raw_data_dir, output_dir, target_classes):
     df = pd.DataFrame(all_data)
     train_df, test_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['group'])
 
-    # 3. CSV 저장 (요청하신 경로)
+    # 3. CSV 저장
     train_df.to_csv(os.path.join(output_dir, "EdaTrain.csv"), index=False)
     test_df.to_csv(os.path.join(output_dir, "EdaTest.csv"), index=False)
 
     print("\n" + "="*30)
-    print(f"✅ 전처리 완료!")
+    print(f"✅ 전처리 완료 (YOLO Crop 적용: {apply_yolo})!")
     print(f"📁 저장 위치: {output_dir}")
     print(f"📊 Train: {len(train_df)}장 / Test: {len(test_df)}장")
     print("="*30)
@@ -283,4 +314,4 @@ if __name__ == "__main__":
     out_dir = r"C:\SmartConveyor\data\raw"
     final_categories = ['55', '24', '205', '197', '46', '40', '60', '240']
 
-    preprocess_and_split_data(data_dir, out_dir, final_categories)
+    preprocess_and_split_data(data_dir, out_dir, final_categories, apply_yolo=True)
