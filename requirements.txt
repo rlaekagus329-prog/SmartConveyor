@@ -1,0 +1,29 @@
+# --- 핵심 딥러닝 프레임워크 ---
+tensorflow>=2.15.0
+numpy>=1.23.5
+
+# --- 데이터 분석 및 EDA (강화) ---
+pandas          # 데이터프레임 처리 (csv 분석)
+matplotlib      # 학습 곡선 및 이미지 시각화
+seaborn         # 히트맵(혼동 행렬) 및 통계 그래프
+
+# --- 데이터 처리 및 시각화 ---
+pandas          # CSV 데이터(Products 10k) 분석용
+pillow          # 이미지 처리(PIL)
+opencv-python   # 동영상 프레임 처리
+python-barcode  # 결과물(바코드) 생성
+
+# --- 웹 대시보드 (UI) ---
+streamlit>=1.30.0
+
+# --- 유틸리티 (바코드 및 기타) ---
+python-barcode
+matplotlib      # 학습 결과 그래프 출력용
+
+# --- 캐글 API (데이터 다운로드용) ---
+kaggle
+
+# --- 모델 평가 및 고급 시각화 ---
+scikit-learn    # Precision, Recall, F1-score 리포트 및 혼동 행렬 계산
+scipy           # 통계적 유의성 검정
+

@@ -1,0 +1,11 @@
+# 데이터셋 폴더 전체 제외
+data/raw/test
+data/raw/train
+data/raw/processed_images
+data/raw/test.csv
+data/raw/train.csv
+
+# 가상환경 및 캐시
+venv/
+__pycache__/
+.ipynb_checkpoints/
