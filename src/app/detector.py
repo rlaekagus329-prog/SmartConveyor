@@ -1,57 +1,78 @@
 import numpy as np
 import tensorflow as tf
-from PIL import Image
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
+import os
+from src.app.inventory_manager import InventoryManager
 
-class SmartDetector:
-    def __init__(self, model_path, class_names):
-        # 1. 모델 로드 (생성 시 한 번만 실행)
+
+class SmartConveyorDetector:
+    def __init__(self, model_path):
+        print(f"🔄 모델 로딩 중: {model_path}")
         self.model = tf.keras.models.load_model(model_path)
-        self.class_names = class_names
+        self.classes = ['55', '24', '205', '197', '46', '40', '60', '240']
+        self.img_size = (224, 224)
+        # --- [추가] 수량 카운터 초기화 ---
+        self.inventory_manager = InventoryManager("inventory.csv")
 
-    def preprocess_image(self, pil_image):
-        """
-        입력받은 PIL 이미지를 모델 규격(224x224)에 맞게 변환
-        """
-        # 이미지 리사이즈 및 정규화
-        img = pil_image.resize((224, 224))
-        img_array = np.array(img) / 255.0
+    def detect(self, image_path):
+        if not os.path.exists(image_path):
+            return None, 0.0
 
-        # 4차원 배치 형태로 확장 (1, 224, 224, 3)
+        # 1. 이미지 로드 (224x224)
+        img = load_img(image_path, target_size=self.img_size)
+        img_array = img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
-        return img_array
 
-    def predict(self, pil_image):
-        """
-        전처리부터 예측까지 한 번에 수행
-        """
-        processed_img = self.preprocess_image(pil_image)
-        predictions = self.model.predict(processed_img)
+        predictions = self.model.predict(img_array, verbose=0)
+        score = np.max(predictions)
+        class_idx = np.argmax(predictions)
+        result_class = self.classes[class_idx]
 
-        # 가장 높은 확률을 가진 인덱스 추출
-        result_idx = np.argmax(predictions[0])
-        label = self.class_names[result_idx]
-        confidence = predictions[0][result_idx] * 100
+        predictions = self.model.predict(img_array, verbose=0)
 
-        return label, confidence
+        # 💡 [진단용 로그] 이 값이 어떻게 나오는지 알려주세요!
+        print(f"DEBUG - Raw Predictions: {predictions}")
+        print(f"DEBUG - Argmax Index: {np.argmax(predictions)}")
 
-    def predict_video_frame(self, frame):
-        """
-        OpenCV 프레임(numpy array)을 받아서 예측 (동영상용)
-        """
-        # OpenCV는 BGR이므로 RGB로 변환 후 PIL로 변경
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pil_img = Image.fromarray(rgb_frame)
-        return self.predict(pil_img)
+        score = np.max(predictions)
 
-    '''
-    📝 담현님을 위한 '구현 포인트' 정리
-preprocess_image 분리: 나중에 이미지 크기를 128x128로 바꾸고 싶을 때 이 함수만 수정하면 됩니다.
+        # --- [추가] 90% 이상의 확신도일 때만 수량 +1 ---
+        if score >= 0.90:
+            # CSV 파일의 해당 클래스 숫자를 +1 하고 파일로 저장함
+            new_count = self.inventory_manager.add_item(result_class)
+            print(f"📈 CSV 업데이트 완료: {result_class}번 (현재 {new_count}개)")
+        else:
+            print(f"⚠️ 확신도가 낮아({score*100:.1f}%) 수량을 추가하지 않았습니다.")
 
-predict_video_frame 대비: 지금은 사진 위주지만, 나중에 OpenCV로 동영상을 읽어올 때 frame을 바로 집어넣을 수 있게 미리 통로를 뚫어놨습니다. (동영상은 색상 체계가 BGR이라 RGB로 바꾸는 게 핵심이에요!)
+        return result_class, score
 
-에러 방지: predictions[0]을 사용하는 이유는 모델이 항상 '배치(묶음)' 단위로 결과를 내놓기 때문입니다. 우리는 한 장씩 넣으니 0번 인덱스만 가져오면 됩니다.
-    
-    '''
+    def show_inventory(self):
 
+        """현재까지 집계된 전체 수량 출력"""
+        print("\n" + "="*10 + " 현재 재고 현황 " + "="*10)
+        current_stock = self.inventory_manager.get_current_stock()
+        for cls, count in current_stock.items():
+            print(f"📦 클래스 {cls: >3} : {count}개")
+        print("="*34)
 
+# --- 메인 실행부 (사용자 입력 기능) ---
+# --- 실행부 ---
+if __name__ == "__main__":
+    MODEL_FILE = "../../smart_conveyor_B_final_90.keras"
+    detector = SmartConveyorDetector(MODEL_FILE)
 
+    while True:
+        user_input = input("\n📸 이미지 경로 입력 (종료 'q', 현황 's'): ").strip().strip('"')
+
+        if user_input.lower() == 'q':
+            detector.show_inventory() # 종료 전 최종 결과 보여주기
+            break
+
+        if user_input.lower() == 's':
+            detector.show_inventory()
+            continue
+
+        label, confidence = detector.detect(user_input)
+
+        if label:
+            print(f"🔍 판별: {label} ({confidence*100:.2f}%)")

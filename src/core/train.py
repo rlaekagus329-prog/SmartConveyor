@@ -135,7 +135,7 @@ if __name__ == "__main__":
     history = model.fit(
         train_ds,
         validation_data=val_ds,
-        epochs=100,
+        epochs=50,
         callbacks=[early_stop, reduce_lr]
     )
     # 학습 실행 2단계 봉인헤제
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     history_fine = model.fit(
         train_ds,
         validation_data=val_ds,
-        epochs=150, # 전체 에포크를 늘려줍니다
+        epochs=20, # 전체 에포크를 늘려줍니다
         initial_epoch=history.epoch[-1], # 1단계가 끝난 지점부터 시작
         callbacks=[early_stop, reduce_lr]
     )
