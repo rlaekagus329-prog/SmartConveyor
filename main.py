@@ -4,17 +4,19 @@ import os
 from src.app.detector import SmartConveyorDetector
 from src.app.inventory_manager import InventoryManager
 
+# 실행 streamlit run main.py
+
 # 1. 초기 설정
 st.set_page_config(page_title="Smart Conveyor AI Dashboard", layout="wide")
 CATEGORY_MAP = {
-    '55': '지갑',
-    '24': '바지',
-    '205': '장신구',
-    '197': '퍼즐',
-    '46': '구두',
-    '40': '운동화',
-    '60': '캐리어',
-    '240': '립스틱'
+    '55': '지갑(55)',
+    '24': '바지(24)',
+    '205': '장신구(205)',
+    '197': '퍼즐(197)',
+    '46': '구두(46)',
+    '40': '운동화(40)',
+    '60': '캐리어(60)',
+    '240': '립스틱(240)'
 }
 
 MODEL_PATH = "smart_conveyor_B_final_90.keras"

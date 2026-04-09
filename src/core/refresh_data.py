@@ -19,7 +19,7 @@ def refresh_csv_from_cleaned_data(processed_root, output_dir):
 
     train_df.to_csv(os.path.join(output_dir, "EdaTrain_Clean.csv"), index=False)
     test_df.to_csv(os.path.join(output_dir, "EdaTest_Clean.csv"), index=False)
-    print(f"✅ 정제된 데이터 기반 CSV 갱신 완료! 총 {len(df)}장")
+    print(f" 정제된 데이터 기반 CSV 갱신 완료! 총 {len(df)}장")
 
 # 경로 설정 후 실행
 refresh_csv_from_cleaned_data(r"C:\SmartConveyor\data\raw\processed_images", r"C:\SmartConveyor\data\raw")

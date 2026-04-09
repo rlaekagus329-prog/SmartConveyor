@@ -6,6 +6,10 @@ import seaborn as sns
 import tensorflow as tf
 from sklearn.metrics import classification_report, confusion_matrix
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
+import warnings
+from tqdm import tqdm
+
+warnings.filterwarnings('ignore', category=UserWarning)
 
 # 1. 경로 및 설정
 model_path = r"C:\SmartConveyor\smart_conveyor_B_final_90.keras"  # 저장한 모델 파일명
@@ -14,11 +18,11 @@ image_dir = r"C:\SmartConveyor\data\raw\processed_images"
 target_classes = ['55', '24', '205', '197', '46', '40', '60', '240']
 
 # 2. 모델 로드
-print("🚀 모델을 불러오는 중...")
+print(" 모델을 불러오는 중...")
 model = tf.keras.models.load_model(model_path)
 
 # 3. 테스트 데이터 준비
-print("📊 테스트 데이터 로딩 중...")
+print(" 테스트 데이터 로딩 중...")
 test_df = pd.read_csv(test_csv)
 y_true = []
 y_pred = []
@@ -26,12 +30,12 @@ y_pred = []
 # 클래스명을 인덱스로 변환하는 맵핑
 class_to_idx = {name: i for i, name in enumerate(target_classes)}
 
-for _, row in test_df.iterrows():
+for _, row in tqdm(test_df.iterrows(), total=len(test_df), desc="이미지 예측 중"):
     img_path = os.path.join(image_dir, str(row['group']), row['name'])
     try:
         # 이미지 전처리 (학습 때와 동일하게 224x224)
         img = load_img(img_path, target_size=(224, 224))
-        img_array = img_to_array(img) / 255.0  # 스케일링 확인 필요 (학습시 했다면 포함)
+        img_array = img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
 
         # 예측
